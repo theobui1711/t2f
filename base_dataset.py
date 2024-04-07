@@ -199,7 +199,7 @@ class BaseDataset(Dataset, ABC):
         elif self.data_args.output_format_type == 'original':
             output_sentences = [self.output_format.format_short_output_(example) for example in self.examples]
         boundary_sentences = [' '.join(example.boundary_tokens) for example in self.examples]
-        # TODO: Sicong if wanna add boundary sequence in encoding process, can directly add boundary sentence to input sentence here
+
         if self.data_args.boundary_in_where == 'Encoder':
             if self.data_args.exp.startswith('no_boundary'):
                 pass
@@ -211,8 +211,11 @@ class BaseDataset(Dataset, ABC):
                     for example in self.examples]
                 # input_sentences = [( ' '.join(example.boundary_tokens) ) + (self.input_format.format_input(example, multitask=multitask)) for example in self.examples] # reverse description and boundary token orders
 
-        logging.info(f'Example input sententece: {input_sentences[0]}')
-        logging.info(f'Example output sententece: {output_sentences[0]}')
+        print(f'Example input sententece: {input_sentences[0]}')
+        print(f'Example output sententece: {output_sentences[0]}')
+
+        # logging.info(f'Example input sententece: {input_sentences[0]}')
+        # logging.info(f'Example output sententece: {output_sentences[0]}')
 
         num_rooms = [len(example.rooms) for example in self.examples]
         regr_labels = []
@@ -225,10 +228,10 @@ class BaseDataset(Dataset, ABC):
         for i in range(len(num_rooms)):
             assert num_rooms[i] == len(regr_labels[i]) / 4
 
-        input_tok = self.tokenizer.batch_encode_plus(
+        input_tok = self.tokenizer(
             input_sentences,
             max_length=max_input_length,
-            return_tensors='pt',
+            # return_tensors='pt',
             padding='max_length',
             truncation=True,
         )
@@ -237,25 +240,30 @@ class BaseDataset(Dataset, ABC):
         # output_index = [self.output_format.format_output_index(example) for example in self.examples]
         # output_tok = self.batch_encode_output_(output_index, max_output_length)
 
-        output_tok = self.tokenizer.batch_encode_plus(
+        output_tok = self.tokenizer(
             output_sentences,
             max_length=max_output_length,
-            return_tensors='pt',
+            # return_tensors='pt',
             padding='max_length',
             truncation=True,
         )
         self._warn_max_sequence_length(max_output_length, output_sentences, "output")
 
-        boundary_tok = self.tokenizer.batch_encode_plus(
+        boundary_tok = self.tokenizer(
             boundary_sentences,
-            max_length=50,
-            return_tensors='pt',
+            max_length=512,
+            # return_tensors='pt',
             padding='max_length',
             truncation=True,
         )
+        print(input_tok.input_ids[0])
+        print(output_tok[0])
+        print(boundary_tok[0])
 
-        assert input_tok.input_ids.size(0) == output_tok['input_ids'].size(0)
-        assert input_tok.input_ids.size(0) == boundary_tok.input_ids.size(0)
+        assert len(input_tok.input_ids) == len(output_tok['input_ids'])
+        assert len(input_tok.input_ids) == len(boundary_tok.input_ids)
+        # assert input_tok.input_ids.size(0) == output_tok['input_ids'].size(0)
+        # assert input_tok.input_ids.size(0) == boundary_tok.input_ids.size(0)
 
         features = []
         if self.data_args.boundary_in_where == 'Encoder':
@@ -264,9 +272,9 @@ class BaseDataset(Dataset, ABC):
                                                                                        output_tok['input_ids'],
                                                                                        num_rooms, regr_labels):
                 features.append(InputFeatures(
-                    input_ids=sentence_input_ids.tolist(),
-                    attention_mask=att_mask.tolist(),
-                    label_ids=label_input_ids.tolist(),
+                    input_ids=sentence_input_ids,
+                    attention_mask=att_mask,
+                    label_ids=label_input_ids,
                     num_rooms=num_room,
                     regr_labels=regr_l
                 ))
@@ -317,7 +325,7 @@ class BaseDataset(Dataset, ABC):
             shuffle=False,
             collate_fn=default_data_collator,
         )
-        total = len(test_data_loader)
+        # total = len(test_data_loader)
         for i, inputs in tqdm(enumerate(test_data_loader), total=len(test_data_loader)):
             if data_args.boundary_in_where == 'Encoder':
                 predictions = model.generate(

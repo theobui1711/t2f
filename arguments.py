@@ -184,7 +184,7 @@ class DataTrainingArguments:
     )
 
     output_format_type: str = field(
-        default='short', metadata={"help": "how to format the output (short, long, or short-relation)"}
+        default='original', metadata={"help": "how to format the output (short, long, or short-relation)"}
     )
 
     comment: str = field(

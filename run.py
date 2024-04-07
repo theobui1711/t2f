@@ -115,7 +115,6 @@ def main():
         data_args.chunk_overlap_eval = data_args.chunk_overlap
 
     # construct name for the output directory
-    # for example: conll04-t5-base-ep200-len256-ratio0-b4-train
     if data_args.exp:
         output_dir = os.path.join(
             training_args.output_dir,
@@ -189,6 +188,7 @@ def main():
     # create tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+        padding="max_length",
     )
 
     # get list of dataset names
@@ -200,6 +200,7 @@ def main():
     # episode loop
     # (note that the episode index is used as the random seed, so that each episode is reproducible)
     evaluation_results = defaultdict(list)
+
     for ep_idx in episode_indices:
         print()
         logging.info(f'Episode {ep_idx} ({len(episode_indices)} episodes total)')
@@ -215,59 +216,59 @@ def main():
         training_args.output_dir = episode_output_dir  # checkpoints are saved in episode-specific directory
 
         # load pretrained model
-        model = T5ForConditionalGeneration.from_pretrained("t5-base")
-        # model = None
-        # if training_args.zero_shot or training_args.do_train:
-        #     logging.info(f"Using model {model_args.model_name_or_path}")
-        #     if data_args.exp == 'scratch':  # train T5 from scratch
-        #         if model_args.model_name_or_path.startswith('t5'):
-        #             model = transformers.T5ForConditionalGeneration(config)
-        #         elif model_args.model_name_or_path.startswith('bert'):
-        #             config_encoder = BertConfig()
-        #             config_decoder = BertConfig()
-        #             config = EncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
-        #             # Initializing a Bert2Bert model from the bert-base-uncased style configurations
-        #             model = EncoderDecoderModel(config=config)
-        #             model.config.decoder_start_token_id = tokenizer.cls_token_id
-        #             model.config.pad_token_id = tokenizer.pad_token_id
-        #             model.config.vocab_size = model.config.decoder.vocab_size
-        #     else:  # load pretrained weights
-        #         if data_args.boundary_in_where == "Encoder":
-        #             # if pretrained model is bert2bert encoder-decoder structure
-        #             if model_args.model_name_or_path.startswith('bert'):
-        #                 model = EncoderDecoderModel.from_encoder_decoder_pretrained('bert-base-uncased',
-        #                                                                             'bert-base-uncased')
-        #                 model.config.decoder_start_token_id = tokenizer.cls_token_id
-        #                 model.config.pad_token_id = tokenizer.pad_token_id
-        #                 model.config.vocab_size = model.config.decoder.vocab_size
-        #
-        #             if data_args.exp.endswith('finetune'):
-        #                 config = T5Config.from_pretrained("t5-base")
-        #                 # model = T5ForConditionalGeneration.from_pretrained("t5-base")
-        #                 #
-        #                 model = T5ForConditionalGeneration.from_pretrained(
-        #                     "/home/sicong/min_max_Floorplan_Generation_Baseline/experiments/floorplan-t5-base-no_boundary-ep20-len512-b12-train-original-baseline/episode0/pytorch_model.bin",
-        #                     config=config)
-        #             else:
-        #                 model = T5ForConditionalGeneration.from_pretrained("t5-base")
-        #                 # model = AutoModelForSeq2SeqLM.from_pretrained(
-        #                 #     model_args.model_name_or_path,
-        #                 #     config=config,
-        #                 #     cache_dir=model_args.cache_dir,
-        #                 # )
-        #
-        #             model = T5ForConditionalGeneration.from_pretrained("t5-base")
-        #
-        #         # model = AutoModelForSeq2SeqLM.from_config(
-        #         #     config=config
-        #         elif data_args.boundary_in_where == "Decoder":
-        #             model = T5ForConditionalGeneration.from_pretrained("t5-base")
-        #         else:
-        #             raise Exception(
-        #                 "pleae indicate where to add boundary information in the argument: boundary_in_where (Encoder or Decoder)")
+        training_args.do_train = True
+        # data_args.boundary_in_where = "Encoder"
+
+        model = None
+        if training_args.zero_shot or training_args.do_train:
+            logging.info(f"Using model {model_args.model_name_or_path}")
+            if data_args.exp == 'scratch':  # train T5 from scratch
+                if model_args.model_name_or_path.startswith('t5'):
+                    model = transformers.T5ForConditionalGeneration(config)
+                elif model_args.model_name_or_path.startswith('bert'):
+                    config_encoder = BertConfig()
+                    config_decoder = BertConfig()
+                    config = EncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
+                    # Initializing a Bert2Bert model from the bert-base-uncased style configurations
+                    model = EncoderDecoderModel(config=config)
+                    model.config.decoder_start_token_id = tokenizer.cls_token_id
+                    model.config.pad_token_id = tokenizer.pad_token_id
+                    model.config.vocab_size = model.config.decoder.vocab_size
+
+            else:  # load pretrained weights
+                if data_args.boundary_in_where == "Encoder":
+                    # if pretrained model is bert2bert encoder-decoder structure
+                    if model_args.model_name_or_path.startswith('bert'):
+                        model = EncoderDecoderModel.from_encoder_decoder_pretrained('bert-base-uncased',
+                                                                                    'bert-base-uncased')
+                        model.config.decoder_start_token_id = tokenizer.cls_token_id
+                        model.config.pad_token_id = tokenizer.pad_token_id
+                        model.config.vocab_size = model.config.decoder.vocab_size
+
+                    if data_args.exp.endswith('finetune'):
+                        config = T5Config.from_pretrained("t5-base")
+                        # model = T5ForConditionalGeneration.from_pretrained("t5-base")
+                        #
+                        model = T5ForConditionalGeneration.from_pretrained(
+                            "/min_max_Floorplan_Generation_Baseline/experiments/floorplan-t5-base-no_boundary-ep20-len512-b12-train-original-baseline/episode0/pytorch_model.bin",
+                            config=config)
+                    else:
+                        model = T5ForConditionalGeneration.from_pretrained("t5-base")
+                        # model = AutoModelForSeq2SeqLM.from_pretrained(
+                        #     model_args.model_name_or_path,
+                        #     config=config,
+                        #     cache_dir=model_args.cache_dir,
+                        # )
+
+                # model = AutoModelForSeq2SeqLM.from_config(
+                #     config=config
+                elif data_args.boundary_in_where == "Decoder":
+                    model = T5ForConditionalGeneration.from_pretrained("t5-base")
+                else:
+                    raise Exception(
+                        "pleae indicate where to add boundary information in the argument: boundary_in_where (Encoder or Decoder)")
 
         # fine-tune the model
-        training_args.do_train = True
         if training_args.do_train:
             # load train dataset
             datasets = []
@@ -363,8 +364,9 @@ def main():
                             t5_config = T5Config.from_pretrained("t5-base")
                             model = T5ForConditionalGeneration(t5_config)
                             # model.load_state_dict(model_dir)
-                            checkpoint = torch.load(os.path.join(model_dir, 'pytorch_model.bin'))
-                            model.load_state_dict(checkpoint)
+                            if os.path.exists(os.path.join(model_dir, 'pytorch_model.bin')):
+                                checkpoint = torch.load(os.path.join(model_dir, 'pytorch_model.bin'))
+                                model.load_state_dict(checkpoint)
                             # model = model.from_pretrained(pretrained_model_name_or_path=model_dir, config='t5-base')
                     elif data_args.boundary_in_where == "Decoder":
                         # model = T5ForConditionalGeneration.from_pretrained(

@@ -10,7 +10,8 @@ from collections import Counter, defaultdict
 import numpy as np
 import random
 import networkx as nx
-from typing import DefaultDict, Dict, List, Tuple, Set
+# from typing import DefaultDict, Dict, List, Tuple, Set
+from typing import List, Dict
 # from sympy import EX
 import torch
 from transformers import PreTrainedTokenizer
@@ -23,8 +24,8 @@ from arguments import DataTrainingArguments
 from input_example import InputFeatures, EntityType, RelationType, Entity, Relation, Intent, InputExample, \
     CorefDocument, Room
 from base_dataset import BaseDataset
-from utils import get_precision_recall_f1, calculate_intersection, calculate_union, render_image, process_boundary_info, \
-    calculate_iou, render_image_
+from utils import get_precision_recall_f1, calculate_intersection, calculate_union, render_image, \
+    process_boundary_info, calculate_iou, render_image_
 
 from coreference_metrics import CorefAllMetrics
 from input_formats import INPUT_FORMATS
@@ -242,7 +243,7 @@ def miss_attributes(self, rooms_attributes):
         strings = ''
         editing_rooms = []
         for room in rooms_attributes:
-            editing_room = DefaultDict()
+            editing_room = defaultdict()
             editing_room['room_type'] = room
             editing_parts = ['aspect_ratio']
             editing_room['editing_parts'] = editing_parts
@@ -258,7 +259,7 @@ def miss_attributes(self, rooms_attributes):
         strings = ''
         editing_rooms = []
         for room in rooms_attributes:
-            editing_room = DefaultDict()
+            editing_room = defaultdict()
             editing_room['room_type'] = room
             editing_parts = ['size']
             editing_room['editing_parts'] = editing_parts
@@ -274,7 +275,7 @@ def miss_attributes(self, rooms_attributes):
         strings = ''
         editing_rooms = []
         for room in rooms_attributes:
-            editing_room = DefaultDict()
+            editing_room = defaultdict()
             editing_room['room_type'] = room
             editing_parts = ['location']
             editing_room['editing_parts'] = editing_parts
@@ -289,7 +290,7 @@ def miss_attributes(self, rooms_attributes):
         drop_idx = random.choice(range(len(rooms_attributes)))
         editing_rooms = []
         for idx, room in enumerate(rooms_attributes):
-            editing_room = DefaultDict()
+            editing_room = defaultdict()
             if int(idx) == int(drop_idx):
                 strings += (rooms_attributes[room]['room_type'] + ' ')
                 editing_room['room_type'] = room
@@ -311,7 +312,7 @@ def miss_attributes(self, rooms_attributes):
             # 0:size 1:aspect ratio 2:location
             if room.startswith('living'):  # living room does not have location attribute
                 drop_idx = random.choice(range(2))
-                editing_room = DefaultDict()
+                editing_room = defaultdict()
                 editing_room['room_type'] = room
                 editing_parts = [dropping_attri[drop_idx]]
                 editing_room['editing_parts'] = editing_parts
@@ -325,7 +326,7 @@ def miss_attributes(self, rooms_attributes):
                     raise Exception('randommiss error 1')
             else:
                 drop_idx = random.choice(range(3))
-                editing_room = DefaultDict()
+                editing_room = defaultdict()
                 editing_room['room_type'] = room
                 editing_parts = [dropping_attri[drop_idx]]
                 editing_room['editing_parts'] = editing_parts
@@ -359,7 +360,7 @@ def miss_attributes(self, rooms_attributes):
 def generate_editing_data(self, example, output_sentence):
     gt_rooms = []
     for room in example.rooms:
-        r = DefaultDict()
+        r = defaultdict()
         r['room_type'] = room.type
         r['x'] = room.x
         r['y'] = room.y
@@ -379,7 +380,7 @@ def generate_editing_data(self, example, output_sentence):
     for i in range(int(num_boxes)):
         start_index = 0 + i * 5
         single_box_token = example.boundary_tokens[start_index: start_index + 5]
-        single_box = DefaultDict()
+        single_box = defaultdict()
         single_box['room_type'] = single_box_token[0]
         single_box['x'] = single_box_token[1]
         single_box['y'] = single_box_token[2]
@@ -394,11 +395,11 @@ def generate_editing_data(self, example, output_sentence):
     )
     predicted_rooms_by_name, predicted_rooms, raw_predicted_relations, wrong_reconstruction, format_error, label_error = res
 
-    predicted_attri = DefaultDict()
+    predicted_attri = defaultdict()
     for attribute_tuple in raw_predicted_relations:
         attribute_type, value, room_tuple, room_type = attribute_tuple
         if room_type not in predicted_attri:
-            predicted_attri[room_type] = DefaultDict()
+            predicted_attri[room_type] = defaultdict()
             # Set invalid value to 128
         try:
             value = int(value)
@@ -418,7 +419,7 @@ def generate_editing_data(self, example, output_sentence):
 
     generated_rooms = []
     for room_type in predicted_attri:
-        generated_room = DefaultDict()
+        generated_room = defaultdict()
         generated_room['room_type'] = room_type
         generated_room['x'] = predicted_attri[room_type]['x coordinate']
         generated_room['y'] = predicted_attri[room_type]['y coordinate']
@@ -429,7 +430,7 @@ def generate_editing_data(self, example, output_sentence):
     # editing rooms' information
     editing_rooms = example.editing_rooms
 
-    editing_instance = DefaultDict()
+    editing_instance = defaultdict()
     editing_instance['generated_rooms'] = generated_rooms
     editing_instance['gt_rooms'] = gt_rooms
     editing_instance['boundary'] = boundary
@@ -750,7 +751,7 @@ class FloorplanDataset(JointERDataset):
                     strings = description['annotated_strings']
                     tokens = re.findall(r"[\w']+|[.,!?;]", strings)
                 else:  # full attributes
-                    # Sicong: for evaluate 1st stage model on human data
+                    # for evaluate 1st stage model on human data
                     if 'annotated_strings' in description:
                         strings = description['annotated_strings']
                         tokens = re.findall(r"[\w']+|[.,!?;]", strings)
@@ -830,7 +831,7 @@ class FloorplanDataset(JointERDataset):
         predicted_rooms_by_name, predicted_rooms, raw_predicted_relations, wrong_reconstruction, format_error, label_error = res
 
         # calculate IoU
-        gt_boxes = DefaultDict()
+        gt_boxes = defaultdict()
         for room in example.rooms:
             gt_x, gt_y, gt_h, gt_w = room.x, room.y, room.h, room.w
             gt_box = [
@@ -838,11 +839,11 @@ class FloorplanDataset(JointERDataset):
                 [int(gt_x - gt_h / 2), int(gt_y + gt_w / 2)], [int(gt_x + gt_h / 2), int(gt_y + gt_w / 2)]]
             gt_boxes[room.type] = gt_box
 
-        predicted_attri = DefaultDict()
+        predicted_attri = defaultdict()
         for attribute_tuple in raw_predicted_relations:
             attribute_type, value, room_tuple, room_type = attribute_tuple
             if room_type not in predicted_attri:
-                predicted_attri[room_type] = DefaultDict()
+                predicted_attri[room_type] = defaultdict()
                 # Set invalid value to 128
             try:
                 value = int(value)
@@ -862,7 +863,7 @@ class FloorplanDataset(JointERDataset):
             predicted_attri.pop(wrong_r)
 
         all_gt_rooms = [room.type for room in example.rooms]
-        predicted_boxes = DefaultDict()
+        predicted_boxes = defaultdict()
         for room in predicted_attri:
             predicted_boxes[room] = [
                 [int(float(predicted_attri[room]['x coordinate']) - float(predicted_attri[room]['height']) / 2),
@@ -888,7 +889,7 @@ class FloorplanDataset(JointERDataset):
             xmax = predicted_boxes[room][3][0]
             predicted_boxes[room] = (ymin, xmin, ymax, xmax)
 
-        # render images for gt and predicted boxes for preview 
+        # render images for gt and predicted boxes for preview
         render_image_(example, predicted_boxes, all_gt_rooms, gt_boxes, output_dir)
 
         # macro_average_iou, micro_average_iou = calculate_iou(gt_boxes, predicted_boxes)

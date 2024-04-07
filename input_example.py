@@ -76,17 +76,11 @@ class Intent:
 
 @dataclass
 class RoomType:
-    """
-    A relation type in a dataset. (Sicong)
-    """
     natural: str = None  # string to use in input/output sentences
 
 
 @dataclass
 class Room:
-    """
-    A room description in a traning/test example. (Sicong)
-    """
     type: RoomType  # the specific room type
     # start: int                  # start index in the description to the room
     # end: int                    # end index in the description to the room
@@ -119,7 +113,6 @@ class InputExample:
     tokens: List[str] = None  # list of tokens (words)
     dataset: Optional[Dataset] = None  # dataset this example belongs to
 
-    # Floorplan (Sicong)
     rooms: List[Room] = None  # list of rooms
     boundary: List[tuple] = None  # list of boundary pixels ([(x,y),(x1,y1),(x2,y2)...])
     boundary_tokens: List[str] = None  # list of tokens (words) describing the boundary

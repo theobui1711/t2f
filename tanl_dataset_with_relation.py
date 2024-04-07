@@ -46,7 +46,7 @@ def read_data(train_dir):
 
             # Save all boundary pixels (ZY)
             boundary_pixels = (boundary_mask == 127).nonzero()  # Seems not to be used
-            # To be consistent with Sicong's structure
+
             boundary_pixels = [(int(boundary_pixels[0][i]), int(boundary_pixels[1][i])) for i in
                                range(len(boundary_pixels[0]))]
 
@@ -315,7 +315,7 @@ def read_data(train_dir):
             all_data.append(sample)
         else:
             sample_index += 1
-    with open('./data/floorplan/floorplan_train.json', 'w') as fp:
+    with open('data/floorplan/floorplan_train.json', 'w') as fp:
         # with open('./data/floorplan/floorplan_dev.json','w') as fp:
         json.dump(all_data, fp)
 

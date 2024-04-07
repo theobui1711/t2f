@@ -22,7 +22,7 @@ for key in last_dict.keys():
 # %%
 # load all images
 dir_paths = []
-for root, dirs, files in os.walk('/home/sicong/min_max_Floorplan_Generation_Baseline/experiments/floorplan-t5-base-no_boundary-ep20-len512-b12-train-original-baseline/episode0/draw/'):
+for root, dirs, files in os.walk('/experiments/floorplan-t5-base-no_boundary-ep20-len512-b12-train-original-baseline/episode0/draw/'):
     dir_paths.extend(files)
 
 # %%
@@ -30,8 +30,8 @@ for root, dirs, files in os.walk('/home/sicong/min_max_Floorplan_Generation_Base
 Macro_IoUs = []
 Micro_IoUs = []
 for img_id in tqdm(dir_paths):
-    gt_image = cv2.imread(os.path.join("/home/sicong/imagen-sicong/dataset/imgs/",f"{img_id}"))
-    pred_image = cv2.imread(os.path.join(f"/home/sicong/min_max_Floorplan_Generation_Baseline/experiments/floorplan-t5-base-no_boundary-ep20-len512-b12-train-original-baseline/episode0/draw/{img_id}"))
+    gt_image = cv2.imread(os.path.join("/imagen/dataset/imgs/",f"{img_id}"))
+    pred_image = cv2.imread(os.path.join(f"/experiments/floorplan-t5-base-no_boundary-ep20-len512-b12-train-original-baseline/episode0/draw/{img_id}"))
 
     new_image = cluster_pixel_values(pred_image, last_dict)
 

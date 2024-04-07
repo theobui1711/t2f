@@ -440,12 +440,10 @@ ind2key = {v: k for k, v in key2ind.items()}
 
 @register_output_format
 class FloorPlanOutputFormat(BaseOutputFormat):
-    """
-    Output formate for Floor plan generation (Sicong)
-    """
     name = 'floorplan'
 
-    def format_short_output(self, example: InputExample) -> str:
+    @staticmethod
+    def format_short_output(example: InputExample) -> str:
         string = ''
         start_token = '['
         end_token = ']'
@@ -513,7 +511,6 @@ class FloorPlanOutputFormat(BaseOutputFormat):
                                 self.RELATION_SEPARATOR_TOKEN, self.END_ENTITY_TOKEN)
 
     def run_inference(self, example: InputExample, output_sentence: str, prediction_index: list):
-        # Sicong: format output sentence to parse
         new_rooms = []
         output_tokens = output_sentence.split()
         if '[' in output_tokens and '|' in output_tokens and 'x_max' in output_tokens:  # long output format

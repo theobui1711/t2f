@@ -211,9 +211,6 @@ class BaseDatasetO(Dataset, ABC):
                     for example in self.examples]
                 # input_sentences = [( ' '.join(example.boundary_tokens) ) + (self.input_format.format_input(example, multitask=multitask)) for example in self.examples] # reverse description and boundary token orders
 
-        print(f'Example input sententece: {input_sentences[0]}')
-        print(f'Example output sententece: {output_sentences[0]}')
-
         # logging.info(f'Example input sententece: {input_sentences[0]}')
         # logging.info(f'Example output sententece: {output_sentences[0]}')
 

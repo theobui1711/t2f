@@ -315,7 +315,7 @@ def read_data(train_dir):
             all_data.append(sample)
         else:
             sample_index += 1
-    with open('data/floorplan/floorplan_train.json', 'w') as fp:
+    with open('data/floorplan/floorplan_warmup.json', 'w') as fp:
         # with open('./data/floorplan/floorplan_dev.json','w') as fp:
         json.dump(all_data, fp)
 

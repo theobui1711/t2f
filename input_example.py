@@ -164,7 +164,7 @@ class InputFeatures:
     attention_mask: List[int]
     boundary_ids: Optional[List[int]] = None
     boundary_mask: Optional[List[int]] = None
-    label_ids: Optional[List[int]] = None
+    labels: Optional[List[int]] = None
     num_rooms: Optional[int] = None
     regr_labels: Optional[List[int]] = None
     decoder_attention_mask: Optional[List[int]] = None

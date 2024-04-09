@@ -222,7 +222,7 @@ def main():
         model.to(device)
 
         # Warm-up by training on artificial data
-        if training_args.do_warmup:
+        if training_args.do_train:
             # load warm-up dataset
             for dataset_name in dataset_names:
                 logging.info(f'Process dataset {dataset_name} (train)')

@@ -201,6 +201,8 @@ def main():
     # (note that the episode index is used as the random seed, so that each episode is reproducible)
     evaluation_results = defaultdict(list)
 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     for ep_idx in episode_indices:
         print()
         logging.info(f'Episode {ep_idx} ({len(episode_indices)} episodes total)')
@@ -217,6 +219,7 @@ def main():
 
         # load pretrained model
         model = T5ForConditionalGeneration.from_pretrained("t5-base")
+        model.to(device)
 
         # Warm-up by training on artificial data
         if training_args.do_train:

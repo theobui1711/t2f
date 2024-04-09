@@ -222,7 +222,7 @@ def main():
         model.to(device)
 
         # Warm-up by training on artificial data
-        if training_args.do_train:
+        if training_args.do_warmup:
             # load warm-up dataset
             for dataset_name in dataset_names:
                 logging.info(f'Process dataset {dataset_name} (train)')
@@ -237,19 +237,11 @@ def main():
                     train_subset=data_args.train_subset,
                 )
 
-            # split warm-up dataset into training and validation
-            warmup_train_dataset, warmup_val_dataset = train_test_split(
-                warmup_dataset,
-                test_size=0.1,
-                random_state=ep_idx,
-            )
-
             # construct trainer
             trainer_warmup = Trainer(
                 model=model,
                 args=training_args,
-                train_dataset=warmup_train_dataset,
-                eval_dataset=warmup_val_dataset,
+                train_dataset=warmup_dataset,
                 data_collator=default_data_collator
             )
 

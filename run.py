@@ -337,7 +337,7 @@ def main():
 
                 res = evaluate(
                     model=model, dataset_name=dataset_name, data_args=data_args, tokenizer=tokenizer, split=split,
-                    seed=ep_idx, batch_size=training_args.per_device_eval_batch_size, gpu=args.gpu, output_dir=model_dir
+                    seed=ep_idx, batch_size=training_args.per_device_eval_batch_size, output_dir=model_dir
                 )
                 # store results
                 evaluation_results[comb].append(res)

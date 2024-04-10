@@ -45,14 +45,14 @@ def print_results(results: dict):
 
 
 def evaluate(model, dataset_name: str, data_args: DataTrainingArguments, tokenizer: PreTrainedTokenizer, split: str,
-             seed: int, gpu: int, batch_size: int, output_dir: str) -> Dict[str, float]:
+             seed: int, batch_size: int, output_dir: str) -> Dict[str, float]:
     """
     Evaluate a model on some dataset.
     """
     model.eval()
 
     if torch.cuda.is_available():
-        device = torch.device("cuda", gpu)
+        device = torch.device("cuda")
     else:
         device = torch.device("cpu")
     model.to(device)

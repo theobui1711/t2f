@@ -62,7 +62,7 @@ def main():
         'overwrite_output_dir': True,
         'overwrite_cache': True,
         'per_device_eval_batch_size': 4,
-        'learning_rate': 5e-4,
+        'learning_rate': 5e-7,
         'logging_steps': 1,  # do not log by default = 'logging_steps': 0
         'save_steps': 0,  # do not save checkpoints by default
     }
@@ -217,6 +217,8 @@ def main():
 
         training_args.output_dir = episode_output_dir  # checkpoints are saved in episode-specific directory
 
+        print(data_args.num_beams)
+
         # load pretrained model
         model = T5ForConditionalGeneration.from_pretrained("t5-base")
         model.to(device)
@@ -237,11 +239,34 @@ def main():
                     train_subset=data_args.train_subset,
                 )
 
+                finetune_dataset = load_dataset(
+                    dataset_name,
+                    data_args,
+                    split="finetune",
+                    max_input_length=data_args.max_seq_length,
+                    max_output_length=data_args.max_output_seq_length,
+                    tokenizer=tokenizer,
+                    seed=ep_idx,
+                    train_subset=data_args.train_subset,
+                )
+
+                eval_dataset = load_dataset(
+                    dataset_name,
+                    data_args,
+                    split="eval",
+                    max_input_length=data_args.max_seq_length,
+                    max_output_length=data_args.max_output_seq_length,
+                    tokenizer=tokenizer,
+                    seed=ep_idx,
+                    train_subset=data_args.train_subset,
+                )
+
             # construct trainer
             trainer_warmup = Trainer(
                 model=model,
                 args=training_args,
                 train_dataset=warmup_dataset,
+                eval_dataset=finetune_dataset,
                 data_collator=default_data_collator
             )
 

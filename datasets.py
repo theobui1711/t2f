@@ -823,6 +823,7 @@ class FloorplanDataset(JointERDataset):
         Evaluate an output sentence on a single example of this dataset.
         """
         # extract entities and relations from output sentence
+        print('************************************')
         res = self.output_format.run_inference(
             example,
             output_sentence,
@@ -851,7 +852,7 @@ class FloorplanDataset(JointERDataset):
                 value = 128
             predicted_attri[room_type][attribute_type] = value
 
-        # TODO: examien the predicted_attri patterns
+        # TODO: examine the predicted_attri patterns
         correct_attributes = ['x coordinate', 'y coordinate', 'height', 'width']
         wrong_room = []
         for room_type in predicted_attri:

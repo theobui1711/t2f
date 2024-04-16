@@ -593,11 +593,11 @@ class BaseDataset(Dataset, ABC):
         input_features_format = {
             'input_ids': None,
             'attention_mask': None,
-            'num_rooms': None,
-            'reg_labels': None,
+            # 'num_rooms': None,
+            # 'reg_labels': None,
             'decoder_boundary_ids': None,
             'decoder_boundary_mask': None,
-            'label_ids': None
+            'labels': None
         }
 
         features = []
@@ -608,11 +608,11 @@ class BaseDataset(Dataset, ABC):
                        boundary_tok.input_ids, boundary_tok.attention_mask, output_tok.input_ids):
             input_features_format['input_ids'] = sentence_input_ids.tolist()
             input_features_format['attention_mask'] = att_mask.tolist()
-            input_features_format['num_rooms'] = torch.tensor(num_room, dtype=torch.int64).to(cuda_device)
-            input_features_format['reg_labels'] = torch.tensor(reg_l, dtype=torch.int64).to(cuda_device)
+            # input_features_format['num_rooms'] = torch.tensor(num_room, dtype=torch.int64).to(cuda_device)
+            # input_features_format['reg_labels'] = torch.tensor(reg_l, dtype=torch.int64).to(cuda_device)
             input_features_format['decoder_boundary_ids'] = boundary_input_ids.tolist()
             input_features_format['decoder_boundary_mask'] = boundary_tok_mask.tolist()
-            input_features_format['label_ids'] = label_input_ids.tolist()
+            input_features_format['labels'] = label_input_ids.tolist()
             features.append(input_features_format)
 
         return features

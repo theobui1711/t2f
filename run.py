@@ -217,29 +217,19 @@ def main():
 
         training_args.output_dir = episode_output_dir  # checkpoints are saved in episode-specific directory
 
-        print(data_args.num_beams)
-
         # load pretrained model
         model = T5ForConditionalGeneration.from_pretrained("t5-base")
         model.to(device)
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, betas=(0.9, 0.999), eps=1e-08)
 
         # Warm-up by training on artificial data
         if training_args.do_train:
             # load warm-up dataset
             for dataset_name in dataset_names:
                 logging.info(f'Process dataset {dataset_name} (train)')
-                warmup_dataset = load_dataset(
-                    dataset_name,
-                    data_args,
-                    split="warmup",
-                    max_input_length=data_args.max_seq_length,
-                    max_output_length=data_args.max_output_seq_length,
-                    tokenizer=tokenizer,
-                    seed=ep_idx,
-                    train_subset=data_args.train_subset,
-                )
 
-                finetune_dataset = load_dataset(
+                training_dataset = load_dataset(
                     dataset_name,
                     data_args,
                     split="finetune",
@@ -250,24 +240,17 @@ def main():
                     train_subset=data_args.train_subset,
                 )
 
-                eval_dataset = load_dataset(
-                    dataset_name,
-                    data_args,
-                    split="eval",
-                    max_input_length=data_args.max_seq_length,
-                    max_output_length=data_args.max_output_seq_length,
-                    tokenizer=tokenizer,
-                    seed=ep_idx,
-                    train_subset=data_args.train_subset,
-                )
+                # split the training dataset into training and validation
+                train_dataset, val_dataset = train_test_split(training_dataset, test_size=0.2)
 
             # construct trainer
             trainer_warmup = Trainer(
                 model=model,
                 args=training_args,
-                train_dataset=warmup_dataset,
-                eval_dataset=finetune_dataset,
-                data_collator=default_data_collator
+                train_dataset=train_dataset,
+                eval_dataset=val_dataset,
+                data_collator=default_data_collator,
+                optimizers=(optimizer, None),
             )
 
             # start trainer

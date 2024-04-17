@@ -543,7 +543,6 @@ class BaseDataset(Dataset, ABC):
         )
 
     def compute_features(self, max_input_length: int, max_output_length: int, multitask: bool = False):
-        input_sentences = [self.input_format.format_input(example, multitask=multitask) for example in self.examples]
         if self.data_args.output_format_type == 'short-relation':
             output_sentences = [self.output_format.format_short_output_with_relation(example) for example in
                                 self.examples]
@@ -555,10 +554,14 @@ class BaseDataset(Dataset, ABC):
             output_sentences = [self.output_format.format_short_output_(example) for example in self.examples]
         boundary_sentences = [' '.join(example.boundary_tokens) for example in self.examples]
 
-        # logging.info("Boundary information is added to the end of the input sequence and used in Encoder.")
-        # input_sentences = [
-        #     ((self.input_format.format_input(example, multitask=multitask)) + ' '.join(example.boundary_tokens))
-        #     for example in self.examples]
+        if self.data_args.boundary_in_where == 'Encoder':
+            logging.info("Boundary information is added to the end of the input sequence and used in Encoder.")
+            input_sentences = [
+                ((self.input_format.format_input(example, multitask=multitask)) + ' '.join(example.boundary_tokens))
+                for example in self.examples]
+        else:
+            input_sentences = [self.input_format.format_input(example, multitask=multitask) for example in
+                               self.examples]
 
         logging.info(f'Example input sentence: {input_sentences[0]}')
         logging.info(f'Example output sentence: {output_sentences[0]}')
@@ -577,9 +580,6 @@ class BaseDataset(Dataset, ABC):
         input_tok = self.tokenize_function(input_sentences, max_input_length)
         self._warn_max_sequence_length(max_input_length, input_sentences, "input")
 
-        # output_index = [self.output_format.format_output_index(example) for example in self.examples]
-        # output_tok = self.batch_encode_output_(output_index, max_output_length)
-
         output_tok = self.tokenize_function(output_sentences, max_output_length)
         self._warn_max_sequence_length(max_output_length, output_sentences, "output")
 
@@ -590,15 +590,22 @@ class BaseDataset(Dataset, ABC):
 
         cuda_device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-        input_features_format = {
-            'input_ids': None,
-            'attention_mask': None,
-            # 'num_rooms': None,
-            # 'reg_labels': None,
-            'decoder_boundary_ids': None,
-            'decoder_boundary_mask': None,
-            'labels': None
-        }
+        if self.data_args.boundary_in_where == 'Encoder':
+            input_features_format = {
+                'input_ids': None,
+                'attention_mask': None,
+                'num_rooms': None,
+                'reg_labels': None,
+                'labels': None
+            }
+        else:
+            input_features_format = {
+                'input_ids': None,
+                'attention_mask': None,
+                'decoder_boundary_ids': None,
+                'decoder_boundary_mask': None,
+                'labels': None
+            }
 
         features = []
 
@@ -608,10 +615,12 @@ class BaseDataset(Dataset, ABC):
                        boundary_tok.input_ids, boundary_tok.attention_mask, output_tok.input_ids):
             input_features_format['input_ids'] = sentence_input_ids.tolist()
             input_features_format['attention_mask'] = att_mask.tolist()
-            # input_features_format['num_rooms'] = torch.tensor(num_room, dtype=torch.int64).to(cuda_device)
-            # input_features_format['reg_labels'] = torch.tensor(reg_l, dtype=torch.int64).to(cuda_device)
-            input_features_format['decoder_boundary_ids'] = boundary_input_ids.tolist()
-            input_features_format['decoder_boundary_mask'] = boundary_tok_mask.tolist()
+            if self.data_args.boundary_in_where == 'Encoder':
+                input_features_format['num_rooms'] = torch.tensor(num_room, dtype=torch.int64).to(cuda_device)
+                input_features_format['reg_labels'] = torch.tensor(reg_l, dtype=torch.int64).to(cuda_device)
+            else:
+                input_features_format['decoder_boundary_ids'] = boundary_input_ids.tolist()
+                input_features_format['decoder_boundary_mask'] = boundary_tok_mask.tolist()
             input_features_format['labels'] = label_input_ids.tolist()
             features.append(input_features_format)
 

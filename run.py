@@ -218,8 +218,24 @@ def main():
         training_args.output_dir = episode_output_dir  # checkpoints are saved in episode-specific directory
 
         # load pretrained model
-        model = T5ForConditionalGeneration.from_pretrained("t5-base")
-        model.to(device)
+        model = None
+        logging.info(f"Using model {model_args.model_name_or_path}")
+        if model_args.model_name_or_path.startswith('t5'):
+            model = T5ForConditionalGeneration.from_pretrained(model_args.model_name_or_path, config=config)
+        elif model_args.model_name_or_path.startswith('bert'):
+            config_encoder = BertConfig()
+            config_decoder = BertConfig()
+            config = EncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
+            model = EncoderDecoderModel(config=config)
+            model.config.decoder_start_token_id = tokenizer.cls_token_id
+            model.config.pad_token_id = tokenizer.pad_token_id
+            model.config.vocab_size = model.config.decoder.vocab_size
+
+            model = EncoderDecoderModel.from_encoder_decoder_pretrained('bert-base-uncased',
+                                                                        'bert-base-uncased')
+            model.config.decoder_start_token_id = tokenizer.cls_token_id
+            model.config.pad_token_id = tokenizer.pad_token_id
+            model.config.vocab_size = model.config.decoder.vocab_size
 
         optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, betas=(0.9, 0.999), eps=1e-08)
 

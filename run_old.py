@@ -222,51 +222,19 @@ def main():
         model = None
         if training_args.zero_shot or training_args.do_train:
             logging.info(f"Using model {model_args.model_name_or_path}")
-            if data_args.exp == 'scratch':  # train T5 from scratch
-                if model_args.model_name_or_path.startswith('t5'):
-                    model = transformers.T5ForConditionalGeneration(config)
-                elif model_args.model_name_or_path.startswith('bert'):
-                    config_encoder = BertConfig()
-                    config_decoder = BertConfig()
-                    config = EncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
-                    # Initializing a Bert2Bert model from the bert-base-uncased style configurations
-                    model = EncoderDecoderModel(config=config)
-                    model.config.decoder_start_token_id = tokenizer.cls_token_id
-                    model.config.pad_token_id = tokenizer.pad_token_id
-                    model.config.vocab_size = model.config.decoder.vocab_size
+            config_encoder = BertConfig()
+            config_decoder = BertConfig()
+            config = EncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
+            model = EncoderDecoderModel(config=config)
+            model.config.decoder_start_token_id = tokenizer.cls_token_id
+            model.config.pad_token_id = tokenizer.pad_token_id
+            model.config.vocab_size = model.config.decoder.vocab_size
 
-            else:  # load pretrained weights
-                if data_args.boundary_in_where == "Encoder":
-                    # if pretrained model is bert2bert encoder-decoder structure
-                    if model_args.model_name_or_path.startswith('bert'):
-                        model = EncoderDecoderModel.from_encoder_decoder_pretrained('bert-base-uncased',
-                                                                                    'bert-base-uncased')
-                        model.config.decoder_start_token_id = tokenizer.cls_token_id
-                        model.config.pad_token_id = tokenizer.pad_token_id
-                        model.config.vocab_size = model.config.decoder.vocab_size
-
-                    if data_args.exp.endswith('finetune'):
-                        config = T5Config.from_pretrained("t5-base")
-                        # model = T5ForConditionalGeneration.from_pretrained("t5-base")
-                        #
-                        model = T5ForConditionalGeneration.from_pretrained(
-                            "/min_max_Floorplan_Generation_Baseline/experiments/floorplan-t5-base-no_boundary-ep20-len512-b12-train-original-baseline/episode0/pytorch_model.bin",
-                            config=config)
-                    else:
-                        model = T5ForConditionalGeneration.from_pretrained("t5-base")
-                        # model = AutoModelForSeq2SeqLM.from_pretrained(
-                        #     model_args.model_name_or_path,
-                        #     config=config,
-                        #     cache_dir=model_args.cache_dir,
-                        # )
-
-                # model = AutoModelForSeq2SeqLM.from_config(
-                #     config=config
-                elif data_args.boundary_in_where == "Decoder":
-                    model = T5ForConditionalGeneration.from_pretrained("t5-base")
-                else:
-                    raise Exception(
-                        "pleae indicate where to add boundary information in the argument: boundary_in_where (Encoder or Decoder)")
+            model = EncoderDecoderModel.from_encoder_decoder_pretrained('bert-base-uncased',
+                                                                        'bert-base-uncased')
+            model.config.decoder_start_token_id = tokenizer.cls_token_id
+            model.config.pad_token_id = tokenizer.pad_token_id
+            model.config.vocab_size = model.config.decoder.vocab_size
 
         # fine-tune the model
         if training_args.do_train:
@@ -275,7 +243,7 @@ def main():
             for dataset_name in dataset_names:
                 logging.info(f'Process dataset {dataset_name} (train)')
                 dataset = load_dataset(
-                    dataset_name, data_args, split=data_args.train_split,
+                    dataset_name, data_args, split='finetune',
                     max_input_length=data_args.max_seq_length, max_output_length=data_args.max_output_seq_length,
                     tokenizer=tokenizer, seed=ep_idx, train_subset=data_args.train_subset,
                 )

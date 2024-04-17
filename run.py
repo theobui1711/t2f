@@ -62,7 +62,7 @@ def main():
         'overwrite_output_dir': True,
         'overwrite_cache': True,
         'per_device_eval_batch_size': 4,
-        'learning_rate': 5e-7,
+        'learning_rate': 5e-4,
         'logging_steps': 1,  # do not log by default = 'logging_steps': 0
         'save_steps': 0,  # do not save checkpoints by default
     }
@@ -221,7 +221,9 @@ def main():
         model = None
         logging.info(f"Using model {model_args.model_name_or_path}")
         if model_args.model_name_or_path.startswith('t5'):
-            model = T5ForConditionalGeneration.from_pretrained(model_args.model_name_or_path, config=config)
+            # model = T5ForConditionalGeneration.from_pretrained(model_args.model_name_or_path, config=config)
+            model = T5ForConditionalGeneration.from_pretrained(
+                'experiments/floorplan-t5-base-full-ep2-len512-b4-train-original-baseline/episode0')
         elif model_args.model_name_or_path.startswith('bert'):
             config_encoder = BertConfig()
             config_decoder = BertConfig()
@@ -238,6 +240,8 @@ def main():
             model.config.vocab_size = model.config.decoder.vocab_size
 
         optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, betas=(0.9, 0.999), eps=1e-08)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',
+                                                               factor=0.5, patience=1, verbose=True)
 
         # Warm-up by training on artificial data
         if training_args.do_train:
@@ -266,7 +270,7 @@ def main():
                 train_dataset=train_dataset,
                 eval_dataset=val_dataset,
                 data_collator=default_data_collator,
-                optimizers=(optimizer, None),
+                optimizers=(optimizer, scheduler),
             )
 
             # start trainer

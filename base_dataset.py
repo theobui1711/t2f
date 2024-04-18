@@ -554,14 +554,14 @@ class BaseDataset(Dataset, ABC):
             output_sentences = [self.output_format.format_short_output_(example) for example in self.examples]
         boundary_sentences = [' '.join(example.boundary_tokens) for example in self.examples]
 
-        if self.data_args.boundary_in_where == 'Encoder':
-            logging.info("Boundary information is added to the end of the input sequence and used in Encoder.")
-            input_sentences = [
-                ((self.input_format.format_input(example, multitask=multitask)) + ' '.join(example.boundary_tokens))
-                for example in self.examples]
-        else:
-            input_sentences = [self.input_format.format_input(example, multitask=multitask) for example in
-                               self.examples]
+        # if self.data_args.boundary_in_where == 'Encoder':
+        #     logging.info("Boundary information is added to the end of the input sequence and used in Encoder.")
+        #     input_sentences = [
+        #         ((self.input_format.format_input(example, multitask=multitask)) + ' '.join(example.boundary_tokens))
+        #         for example in self.examples]
+        # else:
+        input_sentences = [self.input_format.format_input(example, multitask=multitask) for example in
+                           self.examples]
 
         logging.info(f'Example input sentence: {input_sentences[0]}')
         logging.info(f'Example output sentence: {output_sentences[0]}')

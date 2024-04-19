@@ -562,21 +562,11 @@ class BaseDataset(Dataset, ABC):
         # else:
         input_sentences = [self.input_format.format_input(example, multitask=multitask) for example in
                            self.examples]
-        num_rooms = [len(example.rooms) for example in self.examples]
-        regression_labels = []
-        for example in self.examples:
-            regr_label = []
-            for room in example.rooms:
-                regr_label.extend([room.x, room.y, room.h, room.w])
-            regression_labels.append(regr_label)
+
         features = []
-        for input_sentence, boundary_sentence, num_room, reg_l, output_sentence \
-                in zip(input_sentences, boundary_sentences, num_rooms, regression_labels, output_sentences):
+        for input_sentence, output_sentence in zip(input_sentences, output_sentences):
             features.append({
                 "input_sentence": input_sentence,
-                "boundary_sentence": boundary_sentence,
-                "num_room": num_room,
-                "regression_label": reg_l,
                 "output_sentence": output_sentence
             })
         return features

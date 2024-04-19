@@ -242,6 +242,9 @@ def main():
         optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, betas=(0.9, 0.999), eps=1e-08)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.8)
 
+        # print("*******")
+        # print(training_args)
+        # print("*******")
         # Warm-up by training on artificial data
         if training_args.do_train:
             # load warm-up dataset

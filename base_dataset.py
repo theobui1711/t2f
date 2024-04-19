@@ -562,69 +562,87 @@ class BaseDataset(Dataset, ABC):
         # else:
         input_sentences = [self.input_format.format_input(example, multitask=multitask) for example in
                            self.examples]
-
-        logging.info(f'Example input sentence: {input_sentences[0]}')
-        logging.info(f'Example output sentence: {output_sentences[0]}')
-
         num_rooms = [len(example.rooms) for example in self.examples]
-        regr_labels = []
+        regression_labels = []
         for example in self.examples:
             regr_label = []
             for room in example.rooms:
                 regr_label.extend([room.x, room.y, room.h, room.w])
-            regr_labels.append(regr_label)
-        # check sanity of regression labels
-        for i in range(len(num_rooms)):
-            assert num_rooms[i] == len(regr_labels[i]) / 4
-
-        input_tok = self.tokenize_function(input_sentences, max_input_length)
-        self._warn_max_sequence_length(max_input_length, input_sentences, "input")
-
-        output_tok = self.tokenize_function(output_sentences, max_output_length)
-        self._warn_max_sequence_length(max_output_length, output_sentences, "output")
-
-        boundary_tok = self.tokenize_function(boundary_sentences, 50)
-
-        assert input_tok.input_ids.size(0) == output_tok['input_ids'].size(0)
-        assert input_tok.input_ids.size(0) == boundary_tok.input_ids.size(0)
-
-        cuda_device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-        if self.data_args.boundary_in_where == 'Encoder':
-            input_features_format = {
-                'input_ids': None,
-                'attention_mask': None,
-                'num_rooms': None,
-                'reg_labels': None,
-                'labels': None
-            }
-        else:
-            input_features_format = {
-                'input_ids': None,
-                'attention_mask': None,
-                'decoder_boundary_ids': None,
-                'decoder_boundary_mask': None,
-                'labels': None
-            }
-
+            regression_labels.append(regr_label)
         features = []
-
-        for sentence_input_ids, att_mask, num_room, reg_l, \
-                boundary_input_ids, boundary_tok_mask, label_input_ids \
-                in zip(input_tok.input_ids, input_tok.attention_mask, num_rooms, regr_labels,
-                       boundary_tok.input_ids, boundary_tok.attention_mask, output_tok.input_ids):
-            input_features_format['input_ids'] = sentence_input_ids.tolist()
-            input_features_format['attention_mask'] = att_mask.tolist()
-            if self.data_args.boundary_in_where == 'Encoder':
-                input_features_format['num_rooms'] = torch.tensor(num_room, dtype=torch.int64).to(cuda_device)
-                input_features_format['reg_labels'] = torch.tensor(reg_l, dtype=torch.int64).to(cuda_device)
-            else:
-                input_features_format['decoder_boundary_ids'] = boundary_input_ids.tolist()
-                input_features_format['decoder_boundary_mask'] = boundary_tok_mask.tolist()
-            input_features_format['labels'] = label_input_ids.tolist()
-            features.append(input_features_format)
-
+        for input_sentence, boundary_sentence, num_room, reg_l, output_sentence \
+                in zip(input_sentences, boundary_sentences, num_rooms, regression_labels, output_sentences):
+            features.append({
+                "input_sentence": input_sentence,
+                "boundary_sentence": boundary_sentence,
+                "num_room": num_room,
+                "regression_label": reg_l,
+                "output_sentence": output_sentence
+            })
         return features
+
+        # logging.info(f'Example input sentence: {input_sentences[0]}')
+        # logging.info(f'Example output sentence: {output_sentences[0]}')
+        #
+        # num_rooms = [len(example.rooms) for example in self.examples]
+        # regr_labels = []
+        # for example in self.examples:
+        #     regr_label = []
+        #     for room in example.rooms:
+        #         regr_label.extend([room.x, room.y, room.h, room.w])
+        #     regr_labels.append(regr_label)
+        # # check sanity of regression labels
+        # for i in range(len(num_rooms)):
+        #     assert num_rooms[i] == len(regr_labels[i]) / 4
+        #
+        # input_tok = self.tokenize_function(input_sentences, max_input_length)
+        # self._warn_max_sequence_length(max_input_length, input_sentences, "input")
+        #
+        # output_tok = self.tokenize_function(output_sentences, max_output_length)
+        # self._warn_max_sequence_length(max_output_length, output_sentences, "output")
+        #
+        # boundary_tok = self.tokenize_function(boundary_sentences, 50)
+        #
+        # assert input_tok.input_ids.size(0) == output_tok['input_ids'].size(0)
+        # assert input_tok.input_ids.size(0) == boundary_tok.input_ids.size(0)
+        #
+        # cuda_device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        #
+        # if self.data_args.boundary_in_where == 'Encoder':
+        #     input_features_format = {
+        #         'input_ids': None,
+        #         'attention_mask': None,
+        #         'num_rooms': None,
+        #         'reg_labels': None,
+        #         'labels': None
+        #     }
+        # else:
+        #     input_features_format = {
+        #         'input_ids': None,
+        #         'attention_mask': None,
+        #         'decoder_boundary_ids': None,
+        #         'decoder_boundary_mask': None,
+        #         'labels': None
+        #     }
+        #
+        # features = []
+        #
+        # for sentence_input_ids, att_mask, num_room, reg_l, \
+        #         boundary_input_ids, boundary_tok_mask, label_input_ids \
+        #         in zip(input_tok.input_ids, input_tok.attention_mask, num_rooms, regr_labels,
+        #                boundary_tok.input_ids, boundary_tok.attention_mask, output_tok.input_ids):
+        #     input_features_format['input_ids'] = sentence_input_ids.tolist()
+        #     input_features_format['attention_mask'] = att_mask.tolist()
+        #     if self.data_args.boundary_in_where == 'Encoder':
+        #         input_features_format['num_rooms'] = torch.tensor(num_room, dtype=torch.int64).to(cuda_device)
+        #         input_features_format['reg_labels'] = torch.tensor(reg_l, dtype=torch.int64).to(cuda_device)
+        #     else:
+        #         input_features_format['decoder_boundary_ids'] = boundary_input_ids.tolist()
+        #         input_features_format['decoder_boundary_mask'] = boundary_tok_mask.tolist()
+        #     input_features_format['labels'] = label_input_ids.tolist()
+        #     features.append(input_features_format)
+        #
+        # return features
 
     @staticmethod
     def decode_new(prediction):

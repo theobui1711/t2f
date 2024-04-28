@@ -10,6 +10,11 @@ import numpy as np
 from collections import Counter, defaultdict
 from shapely.geometry import box
 from shapely.ops import unary_union
+import itertools
+import cv2
+from collections import defaultdict
+from input_example import InputExample, Room
+from typing import Tuple
 
 room_idx = {'living room': 0, 'living room 1': 0, 'living room 2': 0, 'master room': 1, 'kitchen': 2, 'bathroom 1': 3,
             'bathroom 2': 3, 'bathroom 3': 3, 'dining room': 4, 'common room 2': 5, 'common room 3': 5,
@@ -510,3 +515,365 @@ def get_precision_recall_f1(num_correct, num_predicted, num_gt):
     f1 = 2. / (1. / precision + 1. / recall) if num_correct > 0 else 0.
 
     return precision, recall, f1
+
+
+
+
+def format_short_output_(example: InputExample) -> str:
+    string = ''
+    start_token = '['
+    end_token = ']'
+    sep = '|'
+    for room in example.rooms:
+        string += f'{start_token} {room.type} {sep} x coordinate = {str(room.x)} {sep} y coordinate = {str(room.y)} {sep} height = {str(room.h)} {sep} width = {str(room.w)} {end_token} '
+    return string
+
+
+def zy_parse_output_sentence(output_sentence):
+    output_tokens = []
+    unmatched_predicted_entities = []
+
+    BEGIN_ENTITY_TOKEN = '['
+    END_ENTITY_TOKEN = ']'
+    SEPARATOR_TOKEN = '|'
+    RELATION_SEPARATOR_TOKEN = '='
+
+    # add spaces around special tokens, so that they are alone when we split
+    padded_output_sentence = output_sentence
+    for special_token in [
+        BEGIN_ENTITY_TOKEN, END_ENTITY_TOKEN,
+        SEPARATOR_TOKEN, RELATION_SEPARATOR_TOKEN,
+    ]:
+        padded_output_sentence = padded_output_sentence.replace(special_token, ' ' + special_token + ' ')
+
+    entity_stack = []  # stack of the entities we are extracting from the output sentence
+    # this is a list of lists [start, state, entity_name_tokens, entity_other_tokens]
+    # where state is "name" (before the first | separator) or "other" (after the first | separator)
+
+    for token in padded_output_sentence.split():
+        if len(token) == 0:
+            continue
+
+        elif token == BEGIN_ENTITY_TOKEN:
+            # begin entity
+            start = len(output_tokens)
+            entity_stack.append([start, "other", [], []])
+
+        elif token == END_ENTITY_TOKEN and len(entity_stack) > 0:
+            # end entity
+            start, state, entity_name_tokens, entity_other_tokens = entity_stack.pop()
+
+            entity_name = ' '.join(entity_name_tokens).strip()
+            end = len(output_tokens)
+
+            tags = []
+
+            # split entity_other_tokens by |
+            splits = [
+                list(y) for x, y in itertools.groupby(entity_other_tokens, lambda z: z == SEPARATOR_TOKEN)
+                if not x
+            ]
+
+            if state == "other" and len(splits) > 0:
+                for x in splits:
+                    tags.append(tuple(' '.join(x).split(' ' + RELATION_SEPARATOR_TOKEN + ' ')))
+
+            unmatched_predicted_entities.append((entity_name, tags, start, end))
+
+        else:
+            # a normal token
+            if len(entity_stack) > 0:
+                # inside some entities
+                if token == SEPARATOR_TOKEN:
+                    x = entity_stack[-1]
+
+                    if x[1] == "name":
+                        # this token marks the end of name tokens for the current entity
+                        x[1] = "other"
+                    else:
+                        # simply add this token to entity_other_tokens
+                        x[3].append(token)
+
+                else:
+                    is_name_token = True
+
+                    for x in reversed(entity_stack):
+                        # check state
+                        if x[1] == "name":
+                            # add this token to entity_name_tokens
+                            x[2].append(token)
+
+                        else:
+                            # add this token to entity_other tokens and then stop going up in the tree
+                            x[3].append(token)
+                            is_name_token = False
+                            break
+
+                    if is_name_token:
+                        output_tokens.append(token)
+
+            else:
+                # outside
+                output_tokens.append(token)
+
+    # update predicted entities with the positions in the original sentence
+    predicted_entities = []
+
+    for entity_name, entity_tags, start, end in unmatched_predicted_entities:
+        new_start = None  # start in the original sequence
+        new_end = None  # end in the original sequence
+
+        entity_tuple = (entity_name, entity_tags, new_start, new_end)
+        predicted_entities.append(entity_tuple)
+
+    return predicted_entities
+
+
+def run_inference(output_sentence: str):
+    new_rooms = []
+    output_tokens = output_sentence.split()
+    if '[' in output_tokens and '|' in output_tokens and 'x_max' in output_tokens:  # long output format
+        output_tokens = output_sentence.split('[')
+        output_tokens.pop(0)
+        tokens = "".join(output_tokens).split(']')
+        tokens.pop(-1)
+        for token in tokens:
+            tok = token.split('|')
+            room_type = tok[0].strip()
+            for t in tok[1:]:
+                if 'x min' in t:
+                    x_min = t.split('=')[1].strip()
+                elif 'y min' in t:
+                    y_min = t.split('=')[1].strip()
+                elif 'x_max' in t:
+                    x_max = t.split('=')[1].strip()
+                elif 'y_max' in t:
+                    y_max = t.split('=')[1].strip()
+            x = int((int(x_min) + int(x_max)) / 2)
+            y = int((int(y_min) + int(y_max)) / 2)
+            w = int(y_max) - int(y_min)
+            h = int(x_max) - int(x_min)
+            room = Room(type=room_type, x=x, y=y, h=h, w=w)
+            new_rooms.append(room)
+        predicted_examples = InputExample(rooms=new_rooms)
+        output_sentence_ = format_short_output_(predicted_examples)
+        pass
+    elif '[' in output_tokens and '|' in output_tokens:  # original output format
+        output_sentence_ = output_sentence
+        pass
+    elif '-1' in output_tokens:  # short-relation output format
+        rooms = []
+        room_attributes = []
+        index = []
+        flag = False
+        for i in range(len(output_tokens)):
+            if flag == False:
+                try:
+                    token = int(output_tokens[i])
+                    if token > 4:
+                        flag = True
+                        index.append(i)
+                except:
+                    pass
+            else:
+                try:
+                    token = int(output_tokens[i])
+                except:
+                    flag = False
+        prev_idx = 0
+        for idx in index:
+            room_attributes.append(output_tokens[idx:idx + 4])
+            rooms.append(" ".join(output_tokens[prev_idx:idx]))
+            prev_idx = idx + 8
+        for i in range(len(rooms)):
+            # xmin ymin xmax ymax
+            x = int((int(room_attributes[i][0]) + int(room_attributes[i][2])) / 2)
+            y = int((int(room_attributes[i][1]) + int(room_attributes[i][3])) / 2)
+            w = int(room_attributes[i][3]) - int(room_attributes[i][1])
+            h = int(room_attributes[i][2]) - int(room_attributes[i][0])
+            new_rooms.append(Room(type=rooms[i], x=x, y=y, h=h, w=w))
+        predicted_examples = InputExample(rooms=new_rooms)
+        output_sentence_ = format_short_output_(predicted_examples)
+        pass
+    else:  # short output format
+        rooms = []
+        room_attributes = []
+        index = []
+        flag = False
+        for i in range(len(output_tokens)):
+            if flag == False:
+                try:
+                    token = int(output_tokens[i])
+                    if token > 4:
+                        flag = True
+                        index.append(i)
+                except:
+                    pass
+            else:
+                try:
+                    token = int(output_tokens[i])
+                except:
+                    flag = False
+        prev_idx = 0
+        for idx in index:
+            room_attributes.append(output_tokens[idx:idx + 4])
+            rooms.append(" ".join(output_tokens[prev_idx:idx]))
+            prev_idx = idx + 4
+        for i in range(len(rooms)):
+            # xmin ymin xmax ymax
+            x = int((int(room_attributes[i][0]) + int(room_attributes[i][2])) / 2)
+            y = int((int(room_attributes[i][1]) + int(room_attributes[i][3])) / 2)
+            w = int(room_attributes[i][3]) - int(room_attributes[i][1])
+            h = int(room_attributes[i][2]) - int(room_attributes[i][0])
+            new_rooms.append(Room(type=rooms[i], x=x, y=y, h=h, w=w))
+        predicted_examples = InputExample(rooms=new_rooms)
+        output_sentence_ = format_short_output_(predicted_examples)
+
+    room_types = ['living room', 'master room', 'kitchen', 'bathroom', 'dining room', 'common room 2',
+                  'common room 3', 'common room 1', 'common room 4', 'balcony'
+        , 'entrance', 'storage', 'common room']
+    attribute_types = ['x coordinate', 'y coordinate', 'height', 'width']
+    format_error = False  # whether the augmented language format is invalid
+    label_error = False
+
+    if output_sentence_.count('[') != output_sentence_.count(']'):
+        # the parentheses do not match
+        format_error = True
+
+    raw_predictions, wrong_reconstruction = zy_parse_output_sentence(output_sentence_), None
+
+    # update predicted entities with the positions in the original sentence
+    predicted_rooms_by_name = defaultdict(list)
+    predicted_rooms = set()
+    raw_predicted_relations = []
+
+    # process and filter entities
+    for entity_name, tags, start, end in raw_predictions:
+        if len(tags) == 0 or len(tags[0]) > 1:
+            # we do not have a tag for the room type
+            format_error = True
+            continue
+
+        room_type = tags[0][0]
+
+        if room_type in room_types or room_type[:-2] in room_types:
+            room_tuple = (room_type, start, end)
+            predicted_rooms.add(room_tuple)
+            predicted_rooms_by_name[room_type].append(room_tuple)
+
+            # process tags to get relations
+            for tag in tags[1:]:
+                if len(tag) == 2:
+                    attribute_type, value = tag
+                    if attribute_type in attribute_types:
+                        raw_predicted_relations.append((attribute_type, value, room_tuple, room_type))
+                    else:
+                        label_error = True
+
+                else:
+                    # the relation tag has the wrong length
+                    format_error = True
+
+        else:
+            # the predicted entity type does not exist
+            label_error = True
+
+        # error = format_error or label_error or wrong_reconstruction  # whether there is syntax error
+
+    return predicted_rooms_by_name, predicted_rooms, raw_predicted_relations, \
+        wrong_reconstruction, format_error, label_error
+
+
+def render_floor_plan_by_output_sentence(output_sentence):
+    res = run_inference(output_sentence)
+    predicted_rooms_by_name, predicted_rooms, raw_predicted_relations, wrong_reconstruction, format_error, label_error = res
+
+    predicted_attribute = defaultdict()
+    for attribute_tuple in raw_predicted_relations:
+        attribute_type, value, room_tuple, room_type = attribute_tuple
+        if room_type not in predicted_attribute:
+            predicted_attribute[room_type] = defaultdict()
+        try:
+            value = int(value)
+        except:
+            value = 128
+        predicted_attribute[room_type][attribute_type] = value
+
+    # TODO: examine the predicted_attribute patterns
+    correct_attributes = ['x coordinate', 'y coordinate', 'height', 'width']
+    wrong_room = []
+    for room_type in predicted_attribute:
+        if set(list(predicted_attribute[room_type].keys())) != set(correct_attributes):
+            print('wrong output format:')
+            print(predicted_attribute[room_type])
+            wrong_room.append(room_type)
+    for wrong_r in wrong_room:
+        predicted_attribute.pop(wrong_r)
+
+    predicted_boxes = defaultdict()
+    for room in predicted_attribute:
+        predicted_boxes[room] = [
+            [int(predicted_attribute[room]['x coordinate'] - predicted_attribute[room]['height'] / 2),
+             int(predicted_attribute[room]['y coordinate'] - predicted_attribute[room]['width'] / 2)],
+            [int(predicted_attribute[room]['x coordinate'] + predicted_attribute[room]['height'] / 2),
+             int(predicted_attribute[room]['y coordinate'] - predicted_attribute[room]['width'] / 2)],
+            [int(predicted_attribute[room]['x coordinate'] - predicted_attribute[room]['height'] / 2),
+             int(predicted_attribute[room]['y coordinate'] + predicted_attribute[room]['width'] / 2)],
+            [int(predicted_attribute[room]['x coordinate'] + predicted_attribute[room]['height'] / 2),
+             int(predicted_attribute[room]['y coordinate'] + predicted_attribute[room]['width'] / 2)]
+        ]
+
+    for room in predicted_boxes:
+        y_min = predicted_boxes[room][0][1]
+        x_min = predicted_boxes[room][0][0]
+        y_max = predicted_boxes[room][3][1]
+        x_max = predicted_boxes[room][3][0]
+        predicted_boxes[room] = (y_min, x_min, y_max, x_max)
+
+    # render_image_
+    image_height = 256
+    image_width = 256
+    number_of_color_channels = 3
+    background_color = (255, 255, 255)
+    predicted_image = np.full((image_height, image_width, number_of_color_channels), background_color, dtype=np.uint8)
+    boundary_color = [0, 0, 0]
+
+    living = defaultdict()
+    common = defaultdict()
+    master = defaultdict()
+    balcony = defaultdict()
+    bathroom = defaultdict()
+    kitchen = defaultdict()
+    storage = defaultdict()
+    dining = defaultdict()
+    for room in predicted_boxes:
+        if room.startswith('living'):
+            living[room] = predicted_boxes[room]
+        elif room.startswith('common'):
+            common[room] = predicted_boxes[room]
+        elif room.startswith('master'):
+            master[room] = predicted_boxes[room]
+        elif room.startswith('balcony'):
+            balcony[room] = predicted_boxes[room]
+        elif room.startswith('bathroom'):
+            bathroom[room] = predicted_boxes[room]
+        elif room.startswith('kitchen'):
+            kitchen[room] = predicted_boxes[room]
+        elif room.startswith('storage'):
+            storage[room] = predicted_boxes[room]
+        elif room.startswith('dining'):
+            dining[room] = predicted_boxes[room]
+
+    room_type_list = [living, common, master, balcony, bathroom, kitchen, storage, dining]
+    image_room_list = []
+    for room_type in room_type_list:
+        for room in room_type:
+            image_room_list.append(room)
+            left_top_pr = (room_type[room][0], room_type[room][1])
+            right_bt_pr = (room_type[room][2], room_type[room][3])
+
+            color = color_idx[room_idx[room]]
+            # draw room on predicted image
+            cv2.rectangle(predicted_image, left_top_pr, right_bt_pr, color, -1)
+
+    return predicted_image, image_room_list

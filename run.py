@@ -262,7 +262,7 @@ def main():
                     train_subset=data_args.train_subset,
                 )
 
-                # split the training dataset into training and validation
+                # split the training dataset into training and val
                 train_dataset, val_dataset = train_test_split(training_dataset, test_size=0.2)
 
             # construct trainer

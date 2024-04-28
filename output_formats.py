@@ -638,7 +638,10 @@ class FloorPlanOutputFormat(BaseOutputFormat):
 
         # parse output sentence
         # raw_predictions, wrong_reconstruction = self.parse_output_sentence(example, output_sentence)
-        raw_predictions, wrong_reconstruction = self.zy_parse_output_sentence(example, output_sentence_)
+        if example is not None:
+            raw_predictions, wrong_reconstruction = self.zy_parse_output_sentence(example, output_sentence_)
+        else:
+            raw_predictions, wrong_reconstruction = [], False
 
         # update predicted entities with the positions in the original sentence
         predicted_rooms_by_name = defaultdict(list)

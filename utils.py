@@ -517,8 +517,6 @@ def get_precision_recall_f1(num_correct, num_predicted, num_gt):
     return precision, recall, f1
 
 
-
-
 def format_short_output_(example: InputExample) -> str:
     string = ''
     start_token = '['
@@ -875,5 +873,115 @@ def render_floor_plan_by_output_sentence(output_sentence):
             color = color_idx[room_idx[room]]
             # draw room on predicted image
             cv2.rectangle(predicted_image, left_top_pr, right_bt_pr, color, -1)
+
+    return predicted_image, image_room_list
+
+
+def render_floor_plan(example, output_sentence, dataset, with_boundary=True):
+    predicted_index = None
+    image_id = vars(example)['image_id']
+
+    gt_boxes = defaultdict(list)
+    for room in example.rooms:
+        gt_x, gt_y, gt_h, gt_w = room.x, room.y, room.h, room.w
+        gt_box = [
+            [int(gt_x - gt_h / 2), int(gt_y - gt_w / 2)], [int(gt_x + gt_h / 2), int(gt_y - gt_w / 2)],
+            [int(gt_x - gt_h / 2), int(gt_y + gt_w / 2)], [int(gt_x + gt_h / 2), int(gt_y + gt_w / 2)]
+        ]
+        gt_boxes[room.type] = gt_box
+    res = dataset.output_format.run_inference(example, output_sentence, predicted_index)
+    predicted_rooms_by_name, predicted_rooms, raw_predicted_relations, wrong_reconstruction, format_error, label_error = res
+
+    predicted_attribute = defaultdict()
+    for attribute_tuple in raw_predicted_relations:
+        attribute_type, value, room_tuple, room_type = attribute_tuple
+        if room_type not in predicted_attribute:
+            predicted_attribute[room_type] = defaultdict()
+        try:
+            value = int(value)
+        except:
+            value = 128
+        predicted_attribute[room_type][attribute_type] = value
+
+    # TODO: examine the predicted_attribute patterns
+    correct_attributes = ['x coordinate', 'y coordinate', 'height', 'width']
+    wrong_room = []
+    for room_type in predicted_attribute:
+        if set(list(predicted_attribute[room_type].keys())) != set(correct_attributes):
+            print('wrong output format:')
+            print(predicted_attribute[room_type])
+            wrong_room.append(room_type)
+    for wrong_r in wrong_room:
+        predicted_attribute.pop(wrong_r)
+
+    predicted_boxes = defaultdict()
+    for room in predicted_attribute:
+        predicted_boxes[room] = [
+            [int(predicted_attribute[room]['x coordinate'] - predicted_attribute[room]['height'] / 2),
+             int(predicted_attribute[room]['y coordinate'] - predicted_attribute[room]['width'] / 2)],
+            [int(predicted_attribute[room]['x coordinate'] + predicted_attribute[room]['height'] / 2),
+             int(predicted_attribute[room]['y coordinate'] - predicted_attribute[room]['width'] / 2)],
+            [int(predicted_attribute[room]['x coordinate'] - predicted_attribute[room]['height'] / 2),
+             int(predicted_attribute[room]['y coordinate'] + predicted_attribute[room]['width'] / 2)],
+            [int(predicted_attribute[room]['x coordinate'] + predicted_attribute[room]['height'] / 2),
+             int(predicted_attribute[room]['y coordinate'] + predicted_attribute[room]['width'] / 2)]
+        ]
+
+    for room in predicted_boxes:
+        y_min = predicted_boxes[room][0][1]
+        x_min = predicted_boxes[room][0][0]
+        y_max = predicted_boxes[room][3][1]
+        x_max = predicted_boxes[room][3][0]
+        predicted_boxes[room] = (y_min, x_min, y_max, x_max)
+
+    # render_image_
+    image_height = 256
+    image_width = 256
+    number_of_color_channels = 3
+    background_color = (255, 255, 255)
+    predicted_image = np.full((image_height, image_width, number_of_color_channels), background_color, dtype=np.uint8)
+    boundary_color = [0, 0, 0]
+
+    living = defaultdict()
+    common = defaultdict()
+    master = defaultdict()
+    balcony = defaultdict()
+    bathroom = defaultdict()
+    kitchen = defaultdict()
+    storage = defaultdict()
+    dining = defaultdict()
+    for room in predicted_boxes:
+        if room.startswith('living'):
+            living[room] = predicted_boxes[room]
+        elif room.startswith('common'):
+            common[room] = predicted_boxes[room]
+        elif room.startswith('master'):
+            master[room] = predicted_boxes[room]
+        elif room.startswith('balcony'):
+            balcony[room] = predicted_boxes[room]
+        elif room.startswith('bathroom'):
+            bathroom[room] = predicted_boxes[room]
+        elif room.startswith('kitchen'):
+            kitchen[room] = predicted_boxes[room]
+        elif room.startswith('storage'):
+            storage[room] = predicted_boxes[room]
+        elif room.startswith('dining'):
+            dining[room] = predicted_boxes[room]
+
+    room_type_list = [living, common, master, balcony, bathroom, kitchen, storage, dining]
+    image_room_list = []
+    for room_type in room_type_list:
+        for room in room_type:
+            image_room_list.append(room)
+            left_top_pr = (room_type[room][0], room_type[room][1])
+            right_bt_pr = (room_type[room][2], room_type[room][3])
+
+            color = color_idx[room_idx[room]]
+            # draw room on predicted image
+            cv2.rectangle(predicted_image, left_top_pr, right_bt_pr, color, -1)
+
+    if with_boundary:
+        for boundary_pixel in example.boundary:
+            predicted_image[boundary_pixel[0], boundary_pixel[1]] = boundary_color
 
     return predicted_image, image_room_list

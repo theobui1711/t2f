@@ -4,7 +4,6 @@
 .idea
 
 # Rasa DB
-/models/
 tracker.db
 rasa.db*
 events.db*
